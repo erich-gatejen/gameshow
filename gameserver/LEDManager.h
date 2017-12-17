@@ -1,5 +1,6 @@
 #pragma once
 
+#include "windows.h"
 #include <list>
 
 enum RGB {
@@ -33,7 +34,7 @@ private:
 	size_t		numberOfDevices;
 
 	// Do not access these variables directly!  Use the following accessor.  
-	int numDevices;
+	size_t numDevices;
 	int	*ids;
 	deviceId getListIdForDevice(ledID ledid);
 	deviceId getIdForDevice(ledID ledid);

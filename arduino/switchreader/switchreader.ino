@@ -1,8 +1,8 @@
-#define DEBOUNCE_TIME 10
+#define DEBOUNCE_TIME 50
 #define DIGITAL_INPUT_PINS  54
 #define START_PIN  2
 #define MS_LS_PIN  31           // Most significant least-significant-pin. 
-#define BIT_RATE 115200
+#define BIT_RATE 57600
 
 #define PACKET_TYPE__KEY_STATE 1
 
@@ -18,8 +18,11 @@ byte longBuf[8];
 void setup()
 {
 
+  //pinMode(13, OUTPUT);
+
   for (int pin = START_PIN; pin <= DIGITAL_INPUT_PINS; pin++) {
-    pinMode(pin, INPUT_PULLUP);        
+    //if (pin != 13) pinMode(pin, INPUT_PULLUP);       
+    pinMode(pin, INPUT_PULLUP);   
   }
 
   lsPins = 0;
@@ -55,7 +58,7 @@ void checkbutton(int pin)
 
   int val = digitalRead(pin);     // read the input pin
   if (val == 0) {
-    // On, since it is on a pullup resistor
+    // On, since it is on a pullup resistor   
     setPin(pin, true);
 
   } else {

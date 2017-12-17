@@ -1,5 +1,6 @@
 #pragma once
 
+#include <windows.h>
 #include <stdexcept>
 using namespace std;
 
@@ -12,11 +13,21 @@ enum ErrorCodes
 };
 
 class DeviceException : public runtime_error {
-	public:	DeviceException(string reason = "Reason unknown") : runtime_error("Device failure: " + reason) {}
+public:	DeviceException(string reason = "Reason unknown") : runtime_error("Device failure: " + reason) {};
 };
 
 class ComException : public runtime_error {
-	public:	ComException(string reason = "Reason unknown") : runtime_error("Communication failure: " + reason) {}
+public:	ComException(string reason = "Reason unknown") : runtime_error("Communication failure: " + reason) {};
 };
+
+class ComRecoverableException : public runtime_error {
+public:	ComRecoverableException(string reason = "Reason unknown") : runtime_error("Communication failure: " + reason) {};
+};
+
+void print_bytes_stdout(byte	*buffer);
+void print_bytes_stderr(byte	*buffer);
+void print_bytes(ostream *os, byte	*buffer);
+
+bool debugging();
 
 

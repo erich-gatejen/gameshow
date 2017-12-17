@@ -1,11 +1,16 @@
 #include "stdafx.h"
 #include <iostream>
-using namespace std;
 
 #include "Arduino.h"
 
-#define COMMAND_BYTE_TIMEOUT_MS		750
-#define COMMAND_PACKET_TIMEOUT_MS	100
+#define FRAME_BYTE_TIMEOUT_MS		500
+#define PACKET_TIMEOUT_MS			3000
+
+
+ArduinoKeyStates::ArduinoKeyStates(unsigned id) 
+{
+	this->id = id;
+}
 
 /**
 Over-the-wire formats:
@@ -20,39 +25,55 @@ byte 7: key states 48 - 55  - 54 and 55 will always be 0
 byte 8: key states 56 - 63	- Not used and will always be 0
 
 */
-int ArduinoUplinkPacketSizes[] = { 0, 8, 0 };  // WARNING!!!!  WARNING!!!  The largest number in this list must be defined as PACKET_MAX (or it is buffer overrun time).
-#define PACKET_MAX 8
+int ArduinoUplinkPacketSizes[] = { 0, 8, 0, -1, -1, -1, -1, -1,  // WARNING!!!!  WARNING!!!  The largest number in this list must be defined as PACKET_MAX (or it is buffer overrun time).
+	-1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1,
+}; 
+#define PACKET_MAX 10   
+#define ARD_BAD_UPLINK_COMMAND	-1
 
 byte bitMasks[] = { 1 << 0, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7 };
 
-ArduinoKeyStates	*unpackArduinoKeyStates(byte *buffer)
+ArduinoKeyStates	*unpackArduinoKeyStates(unsigned id, byte buffer[8])
 {
-	ArduinoKeyStates *states = new ArduinoKeyStates();
+	ArduinoKeyStates *states = new ArduinoKeyStates(id);
 
-	int pinIndex = 0;
-	for (int byteIndex = 0; byteIndex < 8; byteIndex++)
+	int byteIndex = 0;
+	int bitIndex = 0;
+	for (int pinIndex = 0; pinIndex < ARD_NUM_DIGITAL_INPUT_PINS; pinIndex++)
 	{
-		for (int bitIndex = 0; bitIndex < 8; bitIndex++)
+		if ((buffer[byteIndex] & bitMasks[bitIndex]) > 0)
 		{
+			states->pins[pinIndex] = true;
+		}
+		else
+		{
+			states->pins[pinIndex] = false;
+		}
 
-			if ((buffer[byteIndex] & bitMasks[bitIndex]) > 0)
-			{
-				states->pins[pinIndex] = true;
-			}
-			else
-			{
-				states->pins[pinIndex] = false;
-			}
+		bitIndex++;
+		if (bitIndex > 7)
+		{
+			bitIndex = 0;
+			byteIndex++;
 		}
 	}
 
 	return states;
 }
 
-ArduinoManager::ArduinoManager(int port)
+ArduinoManager::ArduinoManager(unsigned id, int port)
 {
+	this->id = id;
 	serial2Arduino = new Serial(port, ARD_CONFIG_SERIAL_BAUDRATE, ARD_CONFIG_SERIAL_BITS2FRAME, ARD_CONFIG_SERIAL_STOPBITS, ARD_CONFIG_SERIAL_PARITY);
+	serial2Arduino->drain();
 
+	lastKeyStates = new ArduinoKeyStates(id);
 }
 
 ArduinoManager::~ArduinoManager()
@@ -67,12 +88,14 @@ ArduinoKeyStates*	ArduinoManager::checkKeys()
 		throw DeviceException("Arduino device connection is dead.");
 	}
 
-	ArduinoKeyStates* result = nullptr;
 	if (!keysQueue.empty())
 	{
-		 keysQueue.pop(result);
+		delete lastKeyStates;
+		lastKeyStates = keysQueue.front();
+		keysQueue.pop();
 	}
-	return result;
+
+	return lastKeyStates;
 }
 
 void ArduinoManager::start()
@@ -107,26 +130,61 @@ void ArduinoManager::run()
 
 		while (alive)
 		{
-
-			// Wait for something over the wire.  Occasionally check if we are being killed.
-			if (serial2Arduino->readByte(&readByte, COMMAND_BYTE_TIMEOUT_MS) > 0)
+			try
 			{
-				if (ArduinoUplinkPacketSizes[ARDCOMMAND_KEY_STATES] > 0)
+				// Wait for something over the wire.  Occasionally check if we are being killed.
+				if (serial2Arduino->readByte(&readByte, FRAME_BYTE_TIMEOUT_MS) > 0)
 				{
-					if (serial2Arduino->readSerial(buffer, ArduinoUplinkPacketSizes[ARDCOMMAND_KEY_STATES], COMMAND_PACKET_TIMEOUT_MS) < ArduinoUplinkPacketSizes[ARDCOMMAND_KEY_STATES])
+
+					// Frame.  This is to cut down on noisy packets, which persistant timing issues cause.
+					if (readByte == ARD_FRAME_START)
 					{
-						throw "Packet not fully read before timeout. Connection is bad.";
+
+						if (serial2Arduino->readByte(&readByte, PACKET_TIMEOUT_MS) < 1) throw ComRecoverableException("Timeout waiting on command byte");
+						if (readByte == ARD_BAD_UPLINK_COMMAND)
+						{
+							throw "Bad command from device.  Something is wrong.";
+						}
+
+						if (ArduinoUplinkPacketSizes[ARDCOMMAND_KEY_STATES] > 0)
+						{
+							DWORD readBytes = serial2Arduino->readSerial(buffer, ArduinoUplinkPacketSizes[ARDCOMMAND_KEY_STATES], PACKET_TIMEOUT_MS);
+
+							if (readBytes < ArduinoUplinkPacketSizes[ARDCOMMAND_KEY_STATES])
+							{
+								cerr << "Bytes read: " << readBytes << " : bytes=";
+								print_bytes_stderr(buffer);
+								cerr << endl;
+								throw ComRecoverableException("Packet ruined.  Dropping.");
+							}
+						}
+
+						switch (readByte)
+						{
+						case ARDCOMMAND_KEY_STATES:
+							ArduinoKeyStates *keyStates = unpackArduinoKeyStates(this->id, buffer);
+							//keysQueue.push(Reference((void *)keyStates));
+							keysQueue.push(keyStates);
+
+							if (debugging)
+							{
+								cerr << "Key state change. encoded bytes (first 8)= ";
+								print_bytes_stderr(buffer);
+								cerr << endl;
+							}
+
+							break;
+						}
+
 					}
+
 				}
 
-				switch (readByte)
-				{
-				case ARDCOMMAND_KEY_STATES:
-					ArduinoKeyStates  *keyStates = unpackArduinoKeyStates(buffer);
-					keysQueue.push(keyStates);
-					break;
-				}
-
+			}
+			catch (const ComRecoverableException& ce)
+			{
+				cerr << "Recoverable com error: " << ce.what() << std::endl;
+				serial2Arduino->drain();
 			}
 
 		} // end while alive
@@ -134,6 +192,7 @@ void ArduinoManager::run()
 	}
 	catch (const char* msg) {
 		cerr << msg << endl;
+
 	}
 	catch (const std::exception& e)
 	{
@@ -141,5 +200,7 @@ void ArduinoManager::run()
 		cerr << e.what() << std::endl;
 	}
 
+	alive = false;
 }
+
 

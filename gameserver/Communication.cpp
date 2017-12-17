@@ -67,11 +67,45 @@ void setTimeout(HANDLE handler, unsigned int timeoutms)
 	if (!SetCommTimeouts(handler, &timeouts)) throw ComException("Could not set comm timeout");
 }
 
+#define DRAIN_BUFFER_SIZE	256
+
+void Serial::drain()
+{
+	// Purge it first
+	PurgeComm(handler, PURGE_TXABORT | PURGE_TXCLEAR | PURGE_RXABORT | PURGE_RXCLEAR);
+
+	// Force it to immeadiately return, data or no data.
+	COMMTIMEOUTS timeouts;
+	timeouts.ReadIntervalTimeout = MAXDWORD;
+	timeouts.ReadTotalTimeoutMultiplier = 0;
+	timeouts.ReadTotalTimeoutConstant = 0;
+	timeouts.WriteTotalTimeoutMultiplier = 0;
+	timeouts.WriteTotalTimeoutConstant = 0;
+	if (!SetCommTimeouts(handler, &timeouts)) throw ComException("Could not set comm timeout");
+
+	byte	drainDump[DRAIN_BUFFER_SIZE];
+	COMSTAT	status;
+	DWORD	errors;
+	DWORD	bytesRead = 0;
+	DWORD   bytesToRead = 0;
+	ClearCommError(handler, &errors, &status);
+	while (status.cbInQue > 0)
+	{
+		bytesToRead = status.cbInQue;
+		if (bytesToRead > DRAIN_BUFFER_SIZE) bytesToRead = DRAIN_BUFFER_SIZE;
+		ReadFile(handler, drainDump, bytesToRead, &bytesRead, NULL);
+		Sleep(5);
+		ClearCommError(handler, &errors, &status);
+	};
+}
+
 int Serial::readByte(byte *byteBuffer, unsigned int timeoutms)
 {
+	COMSTAT	status;
+	DWORD	errors;
 	ClearCommError(handler, &errors, &status);
-	setTimeout(handler, timeoutms);
 
+	setTimeout(handler, timeoutms);
 	DWORD bytesRead = 0;
 	ReadFile(handler, byteBuffer, 1, &bytesRead, NULL);
 	return bytesRead;
@@ -80,6 +114,8 @@ int Serial::readByte(byte *byteBuffer, unsigned int timeoutms)
 int Serial::readSerial(byte *buffer, unsigned int toRead, unsigned int timeoutms)
 {
 	DWORD bytesRead;
+	COMSTAT	status;
+	DWORD	errors;
 
 	ClearCommError(handler, &errors, &status);
 	setTimeout(handler, timeoutms);
@@ -92,6 +128,9 @@ int Serial::readSerial(byte *buffer, unsigned int toRead, unsigned int timeoutms
 bool Serial::writeSerial(byte *buffer, unsigned int buf_size)
 {
 	DWORD bytesSend;
+	COMSTAT	status;
+	DWORD	errors;
+	ClearCommError(handler, &errors, &status);
 
 	if (!WriteFile(handler, (void*)buffer, buf_size, &bytesSend, 0)) {
 		ClearCommError(handler, &errors, &status);

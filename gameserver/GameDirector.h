@@ -13,6 +13,9 @@ class GameDirector
 	boolean			running;
 	GameContext		*rootContext;
 
+	HANDLE hStdin;
+	boolean checkCommand();
+
 public:
 	GameDirector(LEDManager *ledManager, ArduinoManager *arduinoManager);
 	~GameDirector();

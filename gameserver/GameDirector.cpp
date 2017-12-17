@@ -3,6 +3,13 @@
 #include <iostream>
 using namespace std;
 
+enum GameDirectorKeyCommands
+{
+	GDKC_HELP = 'h',
+	GDKC_SHOW_IKEYS = 'k',
+	GDKC_QUIT = 'q',
+};
+
 void showHelp()
 {
 	cout << "GAMESHOW!" << std::endl;
@@ -20,7 +27,7 @@ void showIkeys(ArduinoKeyStates	*ikeys)
 	cout << "pin #  : on state" << std::endl;
 	for (int pin = 0; pin < ARD_NUM_DIGITAL_INPUT_PINS; pin++)
 	{
-		cout << ikeys->pins[pin] << "  : " << ikeys->pins[pin] << std::endl;
+		cout << pin << "  : " << std::boolalpha << ikeys->pins[pin] << std::endl;
 	}
 	cout << std::endl;
 }
@@ -31,6 +38,12 @@ GameDirector::GameDirector(LEDManager *ledManager, ArduinoManager *arduinoManage
 	rootContext = new GameContext();
 	rootContext->ledManager = ledManager;
 	rootContext->arduinoManager = arduinoManager;
+
+	hStdin = GetStdHandle(STD_INPUT_HANDLE);
+	if (hStdin == INVALID_HANDLE_VALUE)
+	{
+		throw "Could not get handle to console stdin.";
+	}
 }
 
 GameDirector::~GameDirector()
@@ -38,13 +51,32 @@ GameDirector::~GameDirector()
 	delete rootContext;
 }
 
-boolean checkCommand(GameContext *rootContext)
+boolean GameDirector::checkCommand()
 {
-	int character = getchar();
-	if (character != EOF)
+	INPUT_RECORD irInBuf[256];
+	DWORD numberEvents;
+	char character;
+
+	GetNumberOfConsoleInputEvents(hStdin, &numberEvents);
+
+	if (numberEvents > 0)
 	{
-		// Drain stdin so we don't bounce around.
-		while (getchar() != EOF);
+		if (!ReadConsoleInputA(hStdin, irInBuf, 256, &numberEvents))
+		{
+			throw "Console read error";
+		}
+
+		for (DWORD index = 0; index < numberEvents; index++)
+		{
+			if ((irInBuf[index].EventType == KEY_EVENT) && (irInBuf[index].Event.KeyEvent.bKeyDown))
+			{
+				character = irInBuf[index].Event.KeyEvent.uChar.AsciiChar;
+
+				// Ignore the rest.  Let them die.
+				break;
+			}
+		}
+
 		switch (character)
 		{
 		case GDKC_HELP:
@@ -60,6 +92,7 @@ boolean checkCommand(GameContext *rootContext)
 		}
 
 	}
+
 	return true;
 }
 
@@ -70,7 +103,7 @@ void GameDirector::run()
 		running = true;
 		while (running)
 		{
-			running = checkCommand(rootContext);
+			running = checkCommand();
 			Sleep(200);
 		}
 	}
@@ -86,12 +119,6 @@ void GameDirector::run()
 
 }
 
-enum GameDirectorKeyCommands
-{
-	GDKC_HELP = 'h',
-	GDKC_SHOW_IKEYS = 'k',
-	GDKC_QUIT = 'q',
-};
 
 
 
