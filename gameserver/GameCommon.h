@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <stdexcept>
+#include <list>
 using namespace std;
 
 enum ErrorCodes
@@ -24,10 +25,40 @@ class ComRecoverableException : public runtime_error {
 public:	ComRecoverableException(string reason = "Reason unknown") : runtime_error("Communication failure: " + reason) {};
 };
 
+class ConfigurationException : public runtime_error {
+public:	ConfigurationException(string reason = "Reason unknown") : runtime_error("Configuration error: " + reason) {};
+};
+
 void print_bytes_stdout(byte	*buffer);
 void print_bytes_stderr(byte	*buffer);
 void print_bytes(ostream *os, byte	*buffer);
 
 bool debugging();
 
+/****************************************************************************
+* CONFIGURATION SYSTEM
+*/
+
+enum InputTypes
+{
+	IT_ARDUINO
+};
+
+struct InputSource
+{
+	InputTypes	type;
+	unsigned	port;
+	unsigned	id;
+};
+
+class Configuration
+{
+public:
+	list<InputSource>	inputSources;
+
+	Configuration();
+	~Configuration();
+
+	list<InputSource>	*getInputSourcesList();
+};
 

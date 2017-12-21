@@ -36,10 +36,16 @@
     <ClInclude Include="Communication.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Arduino.h">
+    <ClInclude Include="GameDirector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GameDirector.h">
+    <ClInclude Include="GameEvents.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InputManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GameAction.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -56,13 +62,19 @@
     <ClCompile Include="Communication.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Arduino.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="GameDirector.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="GameCommon.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GameEvents.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="InputManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GameAction.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

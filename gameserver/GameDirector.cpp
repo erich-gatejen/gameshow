@@ -7,7 +7,9 @@ enum GameDirectorKeyCommands
 {
 	GDKC_HELP = 'h',
 	GDKC_SHOW_IKEYS = 'k',
-	GDKC_QUIT = 'q',
+	GDKC_LOAD_PROGRAM = 'l',
+	GDKC_RESET = 'r',
+	GDKC_QUIT = 'q'
 };
 
 void showHelp()
@@ -15,17 +17,19 @@ void showHelp()
 	cout << "GAMESHOW!" << std::endl;
 	cout << "key  : action" << std::endl;
 	cout << "h    : show help" << std::endl;
+	cout << "l    : load program" << std::endl;
+	cout << "r    : reset" << std::endl;
 	cout << "k    : show input keys" << std::endl;
 	cout << "q    : quit" << std::endl;
 	cout << std::endl;
 }
 
-void showIkeys(ArduinoKeyStates	*ikeys)
+void showIkeys(InputPinStates	*ikeys)
 {
 	cout << "Input Key States" << std::endl;
 	cout << "ID: " << ikeys->id << std::endl;
 	cout << "pin #  : on state" << std::endl;
-	for (int pin = 0; pin < ARD_NUM_DIGITAL_INPUT_PINS; pin++)
+	for (int pin = 0; pin < ikeys->size; pin++)
 	{
 		cout << pin << "  : " << std::boolalpha << ikeys->pins[pin] << std::endl;
 	}
@@ -33,11 +37,15 @@ void showIkeys(ArduinoKeyStates	*ikeys)
 }
 
 
-GameDirector::GameDirector(LEDManager *ledManager, ArduinoManager *arduinoManager)
+GameDirector::GameDirector(LEDManager *ledManager, InputManager *inputManager, EventManager *eventManager)
 {
 	rootContext = new GameContext();
 	rootContext->ledManager = ledManager;
-	rootContext->arduinoManager = arduinoManager;
+	rootContext->inputManager = inputManager;
+	rootContext->eventManager = eventManager;
+	rootContext->actionManager = new GameActionManager(rootContext->inputManager->checkPins());
+
+	rootContext->eventDispatcher = new GameDirectorEventDispatcher(rootContext);
 
 	hStdin = GetStdHandle(STD_INPUT_HANDLE);
 	if (hStdin == INVALID_HANDLE_VALUE)
@@ -84,7 +92,15 @@ boolean GameDirector::checkCommand()
 			break;
 
 		case GDKC_SHOW_IKEYS:
-			showIkeys(rootContext->arduinoManager->checkKeys());
+			showIkeys(rootContext->inputManager->checkPins());
+			break;
+
+		case GDKC_LOAD_PROGRAM:
+			loadProgram();
+			break;
+			
+		case GDKC_RESET:
+			reset();
 			break;
 
 		case GDKC_QUIT:
@@ -119,6 +135,60 @@ void GameDirector::run()
 
 }
 
+void tempLoadHelper(GameContext *rootContext, unsigned pin, GameEventType etype, GameActionType type, unsigned target, unsigned char r, unsigned char g, unsigned char b)
+{
+	rootContext->eventManager->subscribe(pin, etype, rootContext->eventDispatcher);
+	rootContext->actionManager->mapPinEvent2Action(pin, etype, type, target, r, g, b);
+}
 
+void GameDirector::loadProgram()
+{
+	// Hardcode
+	tempLoadHelper(rootContext, 32, GE_PIN_TRANSITION_ON, GA_LED_SET_LEVELS, 0, 255, 0, 255);
+	tempLoadHelper(rootContext, 32, GE_PIN_TRANSITION_OFF, GA_LED_SET_LEVELS, 0, 0, 0, 0);
+	tempLoadHelper(rootContext, 33, GE_PIN_TRANSITION_ON, GA_LED_SET_LEVELS, 1, 0, 255, 0);
+	tempLoadHelper(rootContext, 33, GE_PIN_TRANSITION_OFF, GA_LED_SET_LEVELS, 1, 0, 0, 0);
+}
 
+void GameDirector::reset()
+{
+	// Zap event subscriptions for changing LEDs.
+	rootContext->eventManager->reset();
+	rootContext->actionManager->reset();
+	rootContext->ledManager->reset();
+}
 
+/****************************************************************************
+* INPUT MANAGER
+*/
+
+GameDirectorEventDispatcher::GameDirectorEventDispatcher(GameContext *context)
+{
+	this->context = context;
+}
+
+GameDirectorEventDispatcher::~GameDirectorEventDispatcher()
+{
+}
+
+void GameDirectorEventDispatcher::handlePinEvent(int pin, GameEventType etype, bool state)
+{
+	GameAction ga = context->actionManager->getAction4PinEvent(pin, etype);
+	switch (ga.type)
+	{
+	case GA_NOP:
+		break;
+
+	case GA_LED_ON:
+		context->ledManager->setRBG(ga.targetId, MAX_LED_LEVEL, MAX_LED_LEVEL, MAX_LED_LEVEL);
+		break;
+
+	case GA_LED_SET_LEVELS:
+		context->ledManager->setRBG(ga.targetId, ga.rlevel, ga.glevel, ga.blevel);
+		break;
+
+	case GA_LED_OFF:
+		context->ledManager->setRBG(ga.targetId, MIN_LED_LEVEL, MIN_LED_LEVEL, MIN_LED_LEVEL);
+		break;
+	}
+}

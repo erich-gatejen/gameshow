@@ -27,3 +27,24 @@ bool debugging()
 {
 	return true;
 }
+
+/****************************************************************************
+* CONFIGURATION SYSTEM
+*/
+
+
+Configuration::Configuration()
+{
+	InputSource inputSource;
+	inputSource.type = IT_ARDUINO;
+	inputSource.port = 6;		// hardcode for now
+	inputSource.id = 1;
+	inputSources.emplace_back(inputSource);
+};
+
+Configuration::~Configuration() 
+{
+}
+
+
+

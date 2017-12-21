@@ -19,11 +19,13 @@ LEDManager::LEDManager()
 		}
 	}
 
-	numDevices = idList.size();
+	numDevices = (unsigned) idList.size();
 	if (numDevices < 1) 
 	{
 		throw DeviceException("No PacLED64 attached.");
 	}
+
+	numLeds = numDevices * LEDS_PER_DEVICE;
 
 	ids = new int[idList.size()];
 	// Blah, don't want to learn the finer details of checked iterators right now.  Brute it.
@@ -60,12 +62,32 @@ deviceId LEDManager::getIdForLED(ledID ledid)
 	return (deviceId) ledid - (listId * LEDS_PER_DEVICE);
 }
 
+ledID LEDManager::getRedIdForRGB(rgbID ledid)
+{
+	return ledid * 3;
+}
+
+ledID LEDManager::getGreenIdForRGB(rgbID ledid)
+{
+	return (ledid * 3) + 1;
+}
+
+ledID LEDManager::getBlueIdForRGB(rgbID ledid)
+{
+	return (ledid * 3) + 2;
+}
+
+
 void LEDManager::setRBG(rgbID rgbid, RGBLED rgbled)
 {
+	setRBG(rgbid, rgbled.red, rgbled.green, rgbled.blue);
 }
 
 void LEDManager::setRBG(rgbID rgbid, INTENSITY redIntensity, INTENSITY greenIntensity, INTENSITY blueIntensity)
 {
+	setLED(getRedIdForRGB(rgbid), redIntensity);
+	setLED(getGreenIdForRGB(rgbid), greenIntensity);
+	setLED(getBlueIdForRGB(rgbid), blueIntensity);
 }
 
 void LEDManager::setLED(ledID ledid, INTENSITY intensity)
@@ -73,3 +95,10 @@ void LEDManager::setLED(ledID ledid, INTENSITY intensity)
 	Pac64SetLEDIntensity(getIdForDevice(ledid), getIdForLED(ledid), intensity);
 }
 
+void LEDManager::reset()
+{
+	for (int ledIndex = 0; ledIndex < numDevices; ledIndex++)
+	{
+		setLED(ledIndex, 0);
+	}
+}
