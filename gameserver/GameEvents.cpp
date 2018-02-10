@@ -17,7 +17,7 @@ EventManager::~EventManager()
 void EventManager::start()
 {
 	lastPinStates = inputManager->checkPins();
-	subscriptions = new list<EventSubscription>[lastPinStates->size];
+	subscriptions.resize(lastPinStates.());
 
 	alive = true;
 	pollThread = new boost::thread(&EventManager::run, this);
@@ -40,12 +40,13 @@ void EventManager::stop()
 
 void EventManager::reset()
 {
-	subscriptions = new list<EventSubscription>[lastPinStates->size];
+	subscriptions.resize(0);
+	subscriptions.resize(lastPinStates.pins.size());
 }
 
 void EventManager::subscribe(int pin, GameEventType etype, EventHandlerInterface *handler)
 {
-	if (pin >= lastPinStates->size) throw "BUG: pin out of range.";
+	if (pin >= lastPinStates.pins.size()) throw "BUG: pin out of range.";
 
 	subscriptions[pin].emplace_back(EventSubscription(etype, handler));
 }
@@ -60,10 +61,11 @@ void EventManager::run()
 		{
 			Sleep(20);
 
-			InputPinStates	*newinStates = inputManager->checkPins();
-			for (int index = 0; index < newinStates->size; index++)
+			InputPinStates	newPinStates = inputManager->checkPins();
+
+			for (int index = 0; index < newPinStates.pins.size(); index++)
 			{
-				if (newinStates->pins[index] != lastPinStates->pins[index])
+				if (newPinStates.pins[index] != lastPinStates.pins[index])
 				{
 					// Transition
 					for (auto const& subscription : subscriptions[index]) {
@@ -73,26 +75,26 @@ void EventManager::run()
 						case GE_NOP:
 							if (debugging())
 							{
-								cout << "Pin #" << index << " transtioned to " << newinStates->pins[index] << std::endl;
+								cout << "Pin #" << index << " transtioned to " << newPinStates.pins[index] << std::endl;
 							}
 							break;
 
 						case GE_PIN_TRANSITION:
 							// Any transition
-							subscription.handler->handlePinEvent(index, subscription.etype, newinStates->pins[index]);
+							subscription.handler->handlePinEvent(index, subscription.etype, newPinStates.pins[index]);
 							break;
 
 						case GE_PIN_TRANSITION_ON:
-							if ((lastPinStates->pins[index] == false) && (newinStates->pins[index] == true))
+							if ((lastPinStates.pins[index] == false) && (newPinStates.pins[index] == true))
 							{
-								subscription.handler->handlePinEvent(index, subscription.etype, newinStates->pins[index]);
+								subscription.handler->handlePinEvent(index, subscription.etype, newPinStates.pins[index]);
 							}
 							break;
 
 						case GE_PIN_TRANSITION_OFF:
-							if ((lastPinStates->pins[index] == true) && (newinStates->pins[index] == false))
+							if ((lastPinStates.pins[index] == true) && (newPinStates.pins[index] == false))
 							{
-								subscription.handler->handlePinEvent(index, subscription.etype, newinStates->pins[index]);
+								subscription.handler->handlePinEvent(index, subscription.etype, newPinStates.pins[index]);
 							}
 							break;
 
@@ -103,7 +105,7 @@ void EventManager::run()
 
 			}  // end if while
 
-			lastPinStates = newinStates;
+			lastPinStates = newPinStates;
 
 		} // end while alive
 

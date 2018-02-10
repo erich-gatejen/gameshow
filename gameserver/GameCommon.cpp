@@ -28,6 +28,11 @@ bool debugging()
 	return true;
 }
 
+bool tracing()
+{
+	return true;
+}
+
 /****************************************************************************
 * CONFIGURATION SYSTEM
 */
@@ -45,6 +50,7 @@ Configuration::Configuration()
 Configuration::~Configuration() 
 {
 }
+
 
 
 

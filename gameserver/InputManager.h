@@ -20,25 +20,30 @@
  * INPUT MANAGER
  */
 
-
 struct InputPinStates
 {
-	unsigned	id;
-	int			size;
-	bool		*pins;
+	unsigned		id;
+	vector<bool>	pins;
 
+	InputPinStates()
+	{
+		id = -1;
+	}
 	InputPinStates(unsigned id, int size);
 };
+
+void tracing__stateChange(string message, InputPinStates newState);
 
 class InputPinSourceInterface
 {
 
 public:
-	InputPinStates * lastPinStates;
+	InputPinStates				lastPinStates;
+	std::queue<InputPinStates>	pinStateQueue;
 
 	InputPinSourceInterface() {}
 	virtual ~InputPinSourceInterface() {}
-	virtual void start(std::queue<InputPinStates *> *pinStateQueue) = 0;
+	virtual void start() = 0;
 	virtual void stop() = 0;
 	virtual unsigned numberOfPins() = 0;
 
@@ -46,9 +51,8 @@ public:
 
 class InputManager {
 
-	std::queue<InputPinStates *>				pinStateQueue;
-	unsigned									numberOfSources;
 	std::vector<InputPinSourceInterface *>		sources;
+	InputPinStates								lastPinStates;   // Last aggregate pin state
 
 public:
 	InputManager(Configuration *config);
@@ -56,7 +60,7 @@ public:
 
 	void start();
 	void stop();
-	InputPinStates*	checkPins();
+	InputPinStates	checkPins();
 };
 
 /****************************************************************************
@@ -77,7 +81,6 @@ class ArduinoInput : public InputPinSourceInterface
 	unsigned		id;
 	bool			alive;
 	Serial*			serial2Arduino;
-	std::queue<InputPinStates *> *pinStateQueue;
 	boost::thread*	arduinoThread;
 
 	void runThread();
@@ -85,7 +88,7 @@ class ArduinoInput : public InputPinSourceInterface
 public:
 	ArduinoInput(unsigned id, unsigned port);
 	~ArduinoInput();
-	void start(std::queue<InputPinStates *> *pinStateQueue);
+	void start();
 	void stop();
 	unsigned numberOfPins();
 };

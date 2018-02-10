@@ -2,9 +2,9 @@
 
 #include "GameAction.h"
 
-GameActionManager::GameActionManager(InputPinStates *pins)
+GameActionManager::GameActionManager(InputPinStates pins)
 {
-	numberOfPins = pins->size;
+	numberOfPins = pins.pins.size();
 	this->reset();
 }
 
@@ -14,7 +14,7 @@ GameActionManager::~GameActionManager()
 
 void GameActionManager::reset()
 {
-	pinEvents2Action.reserve(this->numberOfPins);
+	pinEvents2Action.resize(this->numberOfPins);
 	for (unsigned index = 0; index < this->numberOfPins; index++)
 	{
 		pinEvents2Action[index] = std::vector<GameAction>(GE_META__SIZE);

@@ -34,6 +34,7 @@ void print_bytes_stderr(byte	*buffer);
 void print_bytes(ostream *os, byte	*buffer);
 
 bool debugging();
+bool tracing();
 
 /****************************************************************************
 * CONFIGURATION SYSTEM
@@ -61,4 +62,5 @@ public:
 
 	list<InputSource>	*getInputSourcesList();
 };
+
 

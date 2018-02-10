@@ -36,8 +36,8 @@ struct EventSubscription
 
 class EventManager
 {
-	list<EventSubscription>	*subscriptions;
-	InputPinStates			*lastPinStates;
+	vector<list<EventSubscription>>	subscriptions;
+	InputPinStates					lastPinStates;
 
 	InputManager	*inputManager;
 	bool			alive;

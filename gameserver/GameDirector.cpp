@@ -24,14 +24,14 @@ void showHelp()
 	cout << std::endl;
 }
 
-void showIkeys(InputPinStates	*ikeys)
+void showIkeys(InputPinStates	ikeys)
 {
 	cout << "Input Key States" << std::endl;
-	cout << "ID: " << ikeys->id << std::endl;
+	cout << "ID: " << ikeys.id << std::endl;
 	cout << "pin #  : on state" << std::endl;
-	for (int pin = 0; pin < ikeys->size; pin++)
+	for (int pin = 0; pin < ikeys.pins.size(); pin++)
 	{
-		cout << pin << "  : " << std::boolalpha << ikeys->pins[pin] << std::endl;
+		cout << pin << "  : " << std::boolalpha << ikeys.pins[pin] << std::endl;
 	}
 	cout << std::endl;
 }

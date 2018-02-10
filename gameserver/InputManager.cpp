@@ -10,8 +10,7 @@
 InputPinStates::InputPinStates(unsigned id, int size)
 {
 	this->id = id;
-	this->size = size;
-	this->pins = new bool[size];
+	this->pins.resize(size);
 }
 
 /****************************************************************************
@@ -25,7 +24,7 @@ InputManager::InputManager(Configuration *config)
 	int expectedId = 1;
 
 	// Input sources
-	sources.reserve(config->inputSources.size());
+	sources.resize(config->inputSources.size());
 	for (auto const& sourceConfig : config->inputSources) {		
 		if (expectedId != sourceConfig.id) throw ConfigurationException("Input source ids out of order.  They must start with 1 and increment.");
 
@@ -44,38 +43,51 @@ InputManager::~InputManager()
 	stop();
 }
 
-InputPinStates*	InputManager::checkPins()
+InputPinStates	InputManager::checkPins()
 {
-	InputPinStates* result = nullptr;
 
 	// Support a single source for now.
-	if (!pinStateQueue.empty())
+	if (sources.size() > 1)
 	{
-		if (sources.size() > 1)
+		// Not supported yet.
+	} 
+	else
+	{
+		// New state?  
+		// TODO: backlog protection.   Eventually, we need to ditch stuff if we get behind.
+		if (!sources[0]->pinStateQueue.empty())
 		{
-		} 
+			lastPinStates = sources[0]->pinStateQueue.front();
+			sources[0]->pinStateQueue.pop();
+
+			if (tracing())
+			{
+				tracing__stateChange("new pin state", lastPinStates);
+			}
+
+		}
 		else
 		{
-			delete sources[0]->lastPinStates;
-			result = pinStateQueue.front();
-			pinStateQueue.pop();
+			// TODO needless copy and used for priming.  Find a better way.
+			lastPinStates = sources[0]->lastPinStates;
 		}
 
 	}
 
-	return result;
+	return lastPinStates;
 }
 
 void InputManager::start()
 {
-	for (auto const& source : sources) {
-		source->start(&pinStateQueue);
+	for (auto source : sources) {
+		source->start();
 	}
+	this->checkPins();		// Prime aggregate pin state
 }
 
 void InputManager::stop()
 {
-	for (auto const& source : sources) {
+	for (auto source : sources) {
 		source->stop();
 	}
 }
@@ -112,9 +124,9 @@ int ArduinoUplinkPacketSizes[] = { 0, 8, 0, -1, -1, -1, -1, -1,  // WARNING!!!! 
 
 byte bitMasks[] = { 1 << 0, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6, 1 << 7 };
 
-InputPinStates	*unpackArduinoKeyStates(unsigned id, byte buffer[8])
+InputPinStates	unpackArduinoKeyStates(unsigned id, byte buffer[8])
 {
-	InputPinStates *states = new InputPinStates(id, ARD_NUM_DIGITAL_INPUT_PINS);
+	InputPinStates states = InputPinStates(id, ARD_NUM_DIGITAL_INPUT_PINS);
 
 	int byteIndex = 0;
 	int bitIndex = 0;
@@ -122,11 +134,11 @@ InputPinStates	*unpackArduinoKeyStates(unsigned id, byte buffer[8])
 	{
 		if ((buffer[byteIndex] & bitMasks[bitIndex]) > 0)
 		{
-			states->pins[pinIndex] = true;
+			states.pins[pinIndex] = true;
 		}
 		else
 		{
-			states->pins[pinIndex] = false;
+			states.pins[pinIndex] = false;
 		}
 
 		bitIndex++;
@@ -143,6 +155,7 @@ InputPinStates	*unpackArduinoKeyStates(unsigned id, byte buffer[8])
 ArduinoInput::ArduinoInput(unsigned id, unsigned port)
 {
 	this->id = id;
+	this->lastPinStates = InputPinStates(id, ARD_NUM_DIGITAL_INPUT_PINS);
 	serial2Arduino = new Serial(port, IM_CONFIG_SERIAL_BAUDRATE, IM_CONFIG_SERIAL_BITS2FRAME, IM_CONFIG_SERIAL_STOPBITS, IM_CONFIG_SERIAL_PARITY);
 	serial2Arduino->drain();
 }
@@ -156,7 +169,7 @@ unsigned ArduinoInput::numberOfPins()
 	return ARD_NUM_DIGITAL_INPUT_PINS;
 }
 
-void ArduinoInput::start(std::queue<InputPinStates *> *pinStateQueue)
+void ArduinoInput::start()
 {
 	this->pinStateQueue = pinStateQueue;
 	alive = true;
@@ -221,8 +234,8 @@ void ArduinoInput::runThread()
 						switch (readByte)
 						{
 						case ARDCOMMAND_KEY_STATES:
-							InputPinStates * keyStates = unpackArduinoKeyStates(this->id, buffer);
-							pinStateQueue->push(keyStates);
+							InputPinStates keyStates = unpackArduinoKeyStates(this->id, buffer);
+							pinStateQueue.push(keyStates);
 
 							if (debugging())
 							{
@@ -260,4 +273,21 @@ void ArduinoInput::runThread()
 	}
 
 	alive = false;
+}
+
+/****************************************************************************
+* TOOLS
+*/
+
+void tracing__stateChange(string message, InputPinStates newState)
+{
+	cout << "===== TRACE : " << message << " ========================================" << std::endl;
+	cout << "ID: " << newState.id << std::endl;
+	cout << "pin #  : on state" << std::endl;
+	for (int pin = 0; pin < newState.pins.size(); pin++)
+	{
+		cout << pin << "  : " << std::boolalpha << newState.pins[pin] << std::endl;
+	}
+	cout << std::endl;
+	cout << "===================================================================" << std::endl;
 }

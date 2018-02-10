@@ -44,7 +44,7 @@ LEDManager::~LEDManager()
 
 int LEDManager::getListIdForDevice(ledID ledid)
 {
-	int listId = (int) (ledid / LEDS_PER_DEVICE);
+	int listId = (unsigned) (ledid / LEDS_PER_DEVICE);
 	if (listId > numDevices) {
 		throw DeviceException("LED id outside range of attached devices.  Number of devices = " + numDevices);
 	}

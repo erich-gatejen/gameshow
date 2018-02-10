@@ -29,7 +29,7 @@ class GameActionManager
 
 public:
 
-	GameActionManager(InputPinStates *pins);
+	GameActionManager(InputPinStates pins);
 	~GameActionManager();
 	void reset();
 
